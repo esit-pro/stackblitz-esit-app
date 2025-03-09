@@ -1,246 +1,245 @@
 import { z } from 'zod';
+import { faker } from '@faker-js/faker';
 
 // Define schemas for IT service request data
 export const ItemSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
-  imageUrl: z.string().optional(),
+  clientId: z.string(),
+  clientName: z.string(),
+  clientEmail: z.string().email(),
   createdAt: z.string().or(z.date()),
   updatedAt: z.string().or(z.date()),
-  category: z.string(), // Service category
+  category: z.string(),
+  priority: z.number().min(1).max(5),
+  status: z.enum(['New', 'In Progress', 'Waiting on Client', 'Resolved']),
+  assignedTo: z.string().optional(),
+  dueDate: z.string().optional(),
+  estimatedHours: z.number().optional(),
+  actualHours: z.number().optional(),
+  isInvoiced: z.boolean().optional(),
+  sourceMessageIds: z.array(z.string()),
   tags: z.array(z.string()).optional(),
-  priority: z.number().optional(), // 1-5 scale, 5 being highest
-  status: z.string().optional(), // New, In Progress, Waiting on Client, Resolved
+  notes: z.string().optional(),
+  attachments: z.array(z.string()).optional(),
+  imageUrl: z.string().optional(),
 });
 
 export type Item = z.infer<typeof ItemSchema>;
 
-// Mock database service with fixed IT service requests
+// Define data for generating realistic IT tickets
+const categories = [
+  'Network',
+  'Hardware',
+  'Software',
+  'Security',
+  'User Management',
+  'Facilities',
+  'Data Management',
+  'Licensing'
+];
+
+const statusOptions = ['New', 'In Progress', 'Waiting on Client', 'Resolved'];
+
+const tagsByCategory = {
+  'Network': ['outage', 'connectivity', 'wifi', 'router', 'switch', 'vpn', 'firewall', 'signal'],
+  'Hardware': ['printer', 'laptop', 'desktop', 'server', 'monitor', 'keyboard', 'mouse', 'conference', 'video'],
+  'Software': ['crash', 'update', 'installation', 'compatibility', 'bug', 'crm', 'erp', 'office'],
+  'Security': ['access', 'permissions', 'phishing', 'audit', 'compliance', 'vpn', 'breach', 'training'],
+  'User Management': ['new-hire', 'offboarding', 'email', 'password', 'onboarding', 'account'],
+  'Facilities': ['server-room', 'cooling', 'power', 'maintenance', 'furniture', 'office-move'],
+  'Data Management': ['backup', 'migration', 'recovery', 'database', 'storage', 'archive', 'testing'],
+  'Licensing': ['renewal', 'office365', 'licenses', 'subscription', 'compliance', 'software']
+};
+
+const imageUrls = [
+  'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+  'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+  'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+  'https://images.unsplash.com/photo-1593642702749-b7d2a804fbcf?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+  'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80'
+];
+
+// Common IT issue templates to make descriptions more realistic
+const issueTemplates = [
+  {
+    title: 'Network Outage in {department} Department',
+    description: 'The {department} department is experiencing a {severity} network outage affecting {count} workstations. Users cannot access {affected}. Started approximately {time} ago.'
+  },
+  {
+    title: 'Email Configuration for New Employee',
+    description: 'New {position} {name} starts on {startDay}. Please set up email account, add to appropriate distribution lists, and configure on their laptop.'
+  },
+  {
+    title: '{device} Offline in {location}',
+    description: 'The {deviceModel} in the {location} is showing offline status. Cannot {action} for {event} scheduled at {time} today.'
+  },
+  {
+    title: 'VPN Access for Remote Worker',
+    description: '{position} {name} needs VPN access set up for remote work starting next {timeframe}. They will be working from {location} {duration} and needs access to {resources}.'
+  },
+  {
+    title: '{software} Crashing on {department} Team Computers',
+    description: 'Multiple {department} team members reporting {software} application crashes when {action}. {errorDetails} Issue began after {trigger}.'
+  },
+  {
+    title: 'Data Migration to New {system}',
+    description: 'Plan and schedule {dataType} migration from legacy system to new {system} instance. Approximately {count} records and associated history need transfer.'
+  }
+];
+
+// Helper function to generate random IT service request
+function generateItemData(index: number): Item {
+  const now = new Date();
+  const pastDays = Math.floor(Math.random() * 21); // 0 to 21 days ago
+  const pastHours = Math.floor(Math.random() * 48); // 0 to 48 hours ago
+  
+  const createdAt = new Date(now.getTime() - (pastDays * 24 * 60 * 60 * 1000) - (pastHours * 60 * 60 * 1000));
+  const category = faker.helpers.arrayElement(categories);
+  const priority = faker.number.int({ min: 1, max: 5 });
+  
+  // Higher priority items are more likely to be in progress
+  let statusProbability;
+  if (priority >= 4) {
+    statusProbability = [0.2, 0.5, 0.2, 0.1]; // More likely In Progress
+  } else if (priority === 3) {
+    statusProbability = [0.4, 0.3, 0.2, 0.1]; // Balanced
+  } else {
+    statusProbability = [0.6, 0.2, 0.1, 0.1]; // More likely New
+  }
+  
+  const status = faker.helpers.weightedArrayElement(
+    statusOptions.map((status, i) => ({ 
+      weight: statusProbability[i], 
+      value: status 
+    }))
+  );
+
+  // Generate tags from the appropriate category
+  const availableTags = tagsByCategory[category as keyof typeof tagsByCategory] || [];
+  const tags = faker.helpers.arrayElements(
+    availableTags,
+    faker.number.int({ min: 1, max: 3 })
+  );
+  
+  // Sometimes add high-priority/critical tags
+  if (priority >= 4) {
+    if (Math.random() > 0.7) {
+      tags.push('urgent');
+    }
+    if (Math.random() > 0.8) {
+      tags.push('critical');
+    }
+  }
+  
+  // Maybe assign an image (30% chance)
+  const hasImage = Math.random() > 0.7;
+  const imageUrl = hasImage ? faker.helpers.arrayElement(imageUrls) : undefined;
+  
+  // Generate a realistic title and description
+  const template = faker.helpers.arrayElement(issueTemplates);
+  
+  // Fill in template variables
+  const departments = ['Accounting', 'Sales', 'Marketing', 'HR', 'Development', 'Executive', 'Support', 'Legal'];
+  const locations = ['Main Conference Room', 'East Wing', 'West Wing', 'Boardroom', 'Building B', 'Reception', 'Lab', 'Training Room'];
+  const positions = ['Marketing Coordinator', 'Developer', 'Analyst', 'Manager', 'Director', 'Assistant', 'Specialist', 'Engineer'];
+  const devices = ['Printer', 'Projector', 'Scanner', 'Monitor', 'Laptop', 'Server', 'Router', 'Phone System'];
+  
+  // Generate title with real-world context
+  let title = template.title
+    .replace('{department}', faker.helpers.arrayElement(departments))
+    .replace('{device}', faker.helpers.arrayElement(devices))
+    .replace('{location}', faker.helpers.arrayElement(locations))
+    .replace('{software}', faker.helpers.arrayElement(['CRM', 'ERP', 'Office Suite', 'Accounting Software', 'Project Management Tool', 'Email Client', 'Database']))
+    .replace('{system}', faker.helpers.arrayElement(['CRM', 'Salesforce', 'SharePoint', 'ERP', 'Cloud Storage', 'Microsoft 365', 'Google Workspace']));
+  
+  // Generate realistic variables for description
+  const severity = faker.helpers.arrayElement(['complete', 'partial', 'intermittent']);
+  const count = faker.number.int({ min: 2, max: 25 });
+  const affected = faker.helpers.arrayElements(['shared drives', 'internet', 'email', 'applications', 'printers', 'database'], 
+    faker.number.int({ min: 1, max: 3 })).join(' or ');
+  const time = faker.helpers.arrayElement(['30 minutes', '1 hour', '2 hours', 'yesterday evening']);
+  const startDay = faker.helpers.arrayElement(['Monday', 'next week', 'tomorrow']);
+  const name = `${faker.person.firstName()} ${faker.person.lastName()}`;
+  const deviceModel = `${faker.helpers.arrayElement(['HP', 'Canon', 'Epson', 'Dell', 'Lenovo', 'Apple', 'Samsung'])} ${faker.helpers.arrayElement(['LaserJet', 'Projector', 'Scanner', 'Laptop', 'Desktop', 'Server'])} ${faker.string.alphanumeric(4).toUpperCase()}`;
+  const action = faker.helpers.arrayElement(['print documents', 'connect to calls', 'scan documents', 'present slides', 'access resources']);
+  const event = faker.helpers.arrayElement(['client meeting', 'presentation', 'training session', 'conference call', 'workshop']);
+  const timeframe = faker.helpers.arrayElement(['week', 'month', 'quarter']);
+  const duration = faker.helpers.arrayElement(['permanently', 'for the next month', 'for this project', 'for the foreseeable future']);
+  const resources = faker.helpers.arrayElements(['development servers', 'client database', 'shared drives', 'application resources', 'all systems'], 
+    faker.number.int({ min: 1, max: 2 })).join(' and ');
+  const errorDetails = Math.random() > 0.5 ? 'Error log attached. ' : '';
+  const trigger = faker.helpers.arrayElement(["yesterday's software update", 'recent system changes', 'this morning\'s maintenance', 'the latest patch', 'a recent configuration change']);
+  const dataType = faker.helpers.arrayElement(['customer data', 'user accounts', 'financial records', 'inventory data', 'employee records']);
+  
+  // Generate description with real-world context
+  let description = template.description
+    .replace('{department}', faker.helpers.arrayElement(departments))
+    .replace('{severity}', severity)
+    .replace('{count}', String(count))
+    .replace('{affected}', affected)
+    .replace('{time}', time)
+    .replace('{position}', faker.helpers.arrayElement(positions))
+    .replace('{name}', name)
+    .replace('{startDay}', startDay)
+    .replace('{device}', faker.helpers.arrayElement(devices))
+    .replace('{deviceModel}', deviceModel)
+    .replace('{location}', faker.helpers.arrayElement(locations))
+    .replace('{action}', action)
+    .replace('{event}', event)
+    .replace('{timeframe}', timeframe)
+    .replace('{duration}', duration)
+    .replace('{resources}', resources)
+    .replace('{software}', faker.helpers.arrayElement(['CRM', 'ERP', 'Office Suite', 'Accounting Software', 'Project Management Tool']))
+    .replace('{errorDetails}', errorDetails)
+    .replace('{trigger}', trigger)
+    .replace('{dataType}', dataType)
+    .replace('{system}', faker.helpers.arrayElement(['CRM', 'Salesforce', 'SharePoint', 'ERP']))
+    .replace('{count}', faker.helpers.arrayElement(['15,000', '25,000', '50,000', '100,000']));
+  
+  // Create client information
+  const clientId = `client-${faker.number.int({ min: 1, max: 100 })}`;
+  const clientName = `${faker.person.firstName()} ${faker.person.lastName()}`;
+  const clientEmail = faker.internet.email({ firstName: clientName.split(' ')[0], lastName: clientName.split(' ')[1], provider: 'example.com' });
+  
+  return {
+    id: `ticket-${index + 1}`,
+    title,
+    description,
+    clientId,
+    clientName,
+    clientEmail,
+    createdAt: createdAt.toISOString(),
+    updatedAt: now.toISOString(),
+    category,
+    priority,
+    status: status as 'New' | 'In Progress' | 'Waiting on Client' | 'Resolved',
+    tags,
+    imageUrl,
+    sourceMessageIds: [faker.string.uuid()],
+  };
+}
+
+// Mock database service with dynamically generated IT service requests
 class Database {
   private items: Item[] = [];
 
-  constructor() {
-    // Initialize with exactly 15 fixed IT service requests
-    this.initializeFixedItems();
+  constructor(numItems: number = 15) {
+    // Initialize with specified number of dynamically generated items
+    this.generateItems(numItems);
   }
 
-  private initializeFixedItems() {
-    const now = new Date();
-
-    // Define all 15 fixed IT service request items
-    this.items = [
-      {
-        id: 'ticket-1',
-        title: 'Network Outage in Accounting Department',
-        description:
-          'The accounting department is experiencing a complete network outage affecting 8 workstations. Users cannot access shared drives or internet. Started approximately 30 minutes ago.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Network',
-        tags: ['outage', 'critical', 'accounting'],
-        priority: 5,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-2',
-        title: 'Email Configuration for New Employee',
-        description:
-          'New marketing coordinator Jane Smith starts on Monday. Please set up email account, add to appropriate distribution lists, and configure on her laptop.',
-        category: 'User Management',
-        tags: ['new-hire', 'email', 'onboarding'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 1 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 1 day ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-3',
-        title: 'Printer Offline in Conference Room',
-        description:
-          'The HP LaserJet in the main conference room is showing offline status. Cannot print documents for client meeting scheduled at 2pm today.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Hardware',
-        tags: ['printer', 'conference-room'],
-        priority: 4,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-4',
-        title: 'VPN Access for Remote Worker',
-        description:
-          'Developer Tom Johnson needs VPN access set up for remote work starting next week. He will be working from home permanently and needs full access to development servers.',
-        category: 'Security',
-        tags: ['vpn', 'remote-work', 'access'],
-        priority: 3,
-        status: 'Waiting on Client',
-        createdAt: new Date(
-          now.getTime() - 2 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 2 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-5',
-        title: 'CRM Software Crashing on Sales Team Computers',
-        description:
-          "Multiple sales team members reporting CRM application crashes when generating reports. Error log attached. Issue began after yesterday's software update.",
-        imageUrl:
-          'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Software',
-        tags: ['crm', 'crash', 'sales'],
-        priority: 4,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 18 * 60 * 60 * 1000).toISOString(), // 18 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-6',
-        title: 'Server Room A/C Maintenance',
-        description:
-          "Schedule preventive maintenance for server room air conditioning system. Last service was 6 months ago, and we're observing slightly higher temperatures than normal.",
-        category: 'Facilities',
-        tags: ['server-room', 'maintenance', 'cooling'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 5 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 5 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-7',
-        title: 'Windows Update Breaking Custom Application',
-        description:
-          'Recent Windows security update KB5025885 is causing our inventory tracking application to fail at startup. Affects 3 warehouse computers. Need rollback or fix ASAP.',
-        category: 'Software',
-        tags: ['windows', 'update', 'compatibility'],
-        priority: 4,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 36 * 60 * 60 * 1000).toISOString(), // 36 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-8',
-        title: 'Backup Recovery Test',
-        description:
-          "Quarterly backup recovery test needed. Please restore last week's accounting database backup to test environment and verify data integrity.",
-        category: 'Data Management',
-        tags: ['backup', 'testing', 'compliance'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 3 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 3 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-9',
-        title: 'CEO Laptop Replacement',
-        description:
-          'CEO needs new laptop prepared before international trip next week. Transfer all data, email, and applications from current device. High-priority executive request.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1593642702749-b7d2a804fbcf?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Hardware',
-        tags: ['executive', 'laptop', 'migration'],
-        priority: 5,
-        status: 'In Progress',
-        createdAt: new Date(
-          now.getTime() - 4 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 4 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-10',
-        title: 'WiFi Signal Weak in East Wing',
-        description:
-          'Multiple complaints about poor WiFi connectivity in east wing offices. Signal drops frequently and speeds are below acceptable levels for video conferencing.',
-        category: 'Network',
-        tags: ['wifi', 'connectivity', 'signal'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 7 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 7 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-11',
-        title: 'Phishing Training for Accounting Team',
-        description:
-          'Schedule security awareness and phishing identification training for accounting department following recent attempt. Need 1-hour slot for 12 employees.',
-        category: 'Security',
-        tags: ['training', 'phishing', 'security'],
-        priority: 2,
-        status: 'Waiting on Client',
-        createdAt: new Date(
-          now.getTime() - 10 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 10 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-12',
-        title: 'Office 365 License Renewal',
-        description:
-          'Our Office 365 Business Premium licenses expire in 30 days. Please process renewal for 75 users and confirm updated billing with finance department.',
-        category: 'Licensing',
-        tags: ['office365', 'renewal', 'licenses'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 6 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 6 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-13',
-        title: 'Conference Room Video System Not Working',
-        description:
-          'Video conferencing system in main boardroom not connecting to calls. External clients unable to join scheduled demo at 9am. System was working yesterday.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Hardware',
-        tags: ['conference', 'video', 'urgent'],
-        priority: 5,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-14',
-        title: 'Data Migration to New CRM',
-        description:
-          'Plan and schedule customer data migration from legacy CRM to new Salesforce instance. Approximately 50,000 customer records and associated history need transfer.',
-        category: 'Data Management',
-        tags: ['migration', 'crm', 'salesforce'],
-        priority: 4,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 14 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 14 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-15',
-        title: 'Shared Drive Permissions Audit',
-        description:
-          'Conduct audit of permissions on all shared network drives following department reorganization. Ensure proper access controls and remove permissions for departed employees.',
-        category: 'Security',
-        tags: ['audit', 'permissions', 'compliance'],
-        priority: 2,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 21 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 21 days ago
-        updatedAt: now.toISOString(),
-      },
-    ];
+  private generateItems(count: number) {
+    this.items = Array.from({ length: count }, (_, i) => generateItemData(i));
+    
+    // Sort items by priority (high to low) and then by creation date (newest first)
+    this.items.sort((a, b) => {
+      if (b.priority !== a.priority) {
+        return b.priority - a.priority;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   }
 
   async getItems(
@@ -251,16 +250,14 @@ class Database {
     // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, delay));
 
-    // Limit to max 20 items total
-    const maxItems = Math.min(this.items.length, 20);
     const start = (page - 1) * limit;
-    const end = Math.min(start + limit, maxItems);
+    const end = Math.min(start + limit, this.items.length);
     const items = this.items.slice(start, end);
 
     return {
       items,
-      total: maxItems,
-      hasMore: end < maxItems,
+      total: this.items.length,
+      hasMore: end < this.items.length,
     };
   }
 
@@ -270,6 +267,13 @@ class Database {
 
     const item = this.items.find((item) => item.id === id);
     return item || null;
+  }
+  
+  // Add function to regenerate items for testing
+  async regenerateItems(count: number = 15, delay = 300): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    this.generateItems(count);
+    return;
   }
 }
 

@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { Badge } from '../../../components/ui/badge';
-import { useMessageThreads } from '../../../hooks/use-message-threads';
-import { useServiceRequest } from '../../../components/service-request/service-request-context';
-import { MessageThread } from '../../../models/types'; // Import the MessageThread type
-import { Button } from '../../../components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { useMessageThreads } from '@/hooks/use-message-threads';
+import { useServiceRequest, ServiceRequestProvider } from '@/components/service-request/service-request-context';
+import { MessageThread, ThreadMessage } from '@/models/types';
+import { MessageThread as MessageThreadComponent } from '@/components/messages/message-thread';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   ClipboardList,
   ArrowLeft,
   AlertTriangle
 } from 'lucide-react';
 
-export default function ThreadPage({
+function ThreadPageContent({
   params,
 }: {
   params: { threadId: string };
@@ -57,7 +58,13 @@ export default function ThreadPage({
   const handleReply = async (threadId: string, content: string) => {
     setSubmitting(true);
     try {
-      await addMessageToThread(threadId, content);
+      await addMessageToThread(threadId, {
+        content,
+        sender: 'provider',
+        senderName: 'Support Agent',
+        timestamp: new Date().toISOString(),
+        isRead: true
+      });
       // Refresh the thread data
       const updatedThread = await getThreadById(threadId);
       if (updatedThread) {
@@ -73,14 +80,14 @@ export default function ThreadPage({
   // Handle thread archiving
   const handleArchive = async (threadId: string) => {
     try {
-      const threadToUpdate = thread;
-      const newArchiveState = !threadToUpdate.isArchived;
+      if (!thread) return;
+      const newArchiveState = !thread.isArchived;
       
       await archiveThread(threadId, newArchiveState);
       
       // Update local state
       setThread({
-        ...threadToUpdate,
+        ...thread,
         isArchived: newArchiveState
       });
     } catch (err) {
@@ -101,7 +108,7 @@ export default function ThreadPage({
   };
 
   if (loading) {
-    return <div className="container mx-auto py-6 px-4">Loading conversation...</div>;
+    return <div className="container max-w-7xl mx-auto py-6 px-4">Loading conversation...</div>;
   }
 
   if (error) {
@@ -121,11 +128,11 @@ export default function ThreadPage({
   }
 
   if (!thread) {
-    return <div className="container mx-auto py-6 px-4">Thread not found</div>;
+    return <div className="container max-w-7xl mx-auto py-6 px-4">Thread not found</div>;
   }
 
   return (
-    <div className="container mx-auto py-6 px-4">
+    <div className="container max-w-7xl mx-auto py-6 px-4" data-testid="thread-page">
       <div className="mb-4 flex justify-between items-center">
         <Button variant="outline" onClick={handleBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -149,12 +156,12 @@ export default function ThreadPage({
               <span>
                 #{currentServiceRequest.id.replace('ticket-', '')}: {currentServiceRequest.title}
               </span>
-              <Badge className={
+              <Badge variant={
                 currentServiceRequest.status === 'Resolved' 
-                  ? 'bg-green-100 text-green-800' 
+                  ? 'secondary' 
                   : currentServiceRequest.status === 'In Progress'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'default'
+                  : 'outline'
               }>
                 {currentServiceRequest.status}
               </Badge>
@@ -163,12 +170,22 @@ export default function ThreadPage({
         </Alert>
       )}
       
-      <MessageThread 
+      <MessageThreadComponent 
         thread={thread} 
         onReply={handleReply} 
         onArchive={handleArchive}
         isSubmitting={submitting}
       />
     </div>
+  );
+}
+
+export default function ThreadPage(props: { params: { threadId: string } }) {
+  return (
+    <Suspense fallback={<div className="container max-w-7xl mx-auto py-6 px-4">Loading conversation...</div>}>
+      <ServiceRequestProvider>
+        <ThreadPageContent {...props} />
+      </ServiceRequestProvider>
+    </Suspense>
   );
 }

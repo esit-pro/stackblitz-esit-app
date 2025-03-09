@@ -7,6 +7,7 @@ export interface ServiceRequestContextType {
   serviceRequests: ServiceRequest[];
   currentServiceRequest: ServiceRequest | null;
   loading: boolean;
+  loadingDetails: boolean;
   error: Error | null;
   fetchServiceRequests: (page?: number, limit?: number) => Promise<void>;
   fetchServiceRequestById: (id: string) => Promise<void>;
@@ -15,6 +16,7 @@ export interface ServiceRequestContextType {
   getRelatedMessages: (serviceRequestId: string) => Promise<ClientMessage[]>;
   convertMessageToServiceRequest: (message: ClientMessage, category: string, priority: number) => Promise<string | null>;
   linkMessageToServiceRequest: (messageId: string, serviceRequestId: string) => Promise<boolean>;
+  regenerateServiceRequests: (count?: number) => Promise<void>;
 }
 
 const ServiceRequestContext = createContext<ServiceRequestContextType | undefined>(undefined);
@@ -27,6 +29,7 @@ export const ServiceRequestProvider: React.FC<ServiceRequestProviderProps> = ({ 
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [currentServiceRequest, setCurrentServiceRequest] = useState<ServiceRequest | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchServiceRequests = useCallback(async (page = 1, limit = 20) => {
@@ -43,15 +46,21 @@ export const ServiceRequestProvider: React.FC<ServiceRequestProviderProps> = ({ 
   }, []);
 
   const fetchServiceRequestById = useCallback(async (id: string) => {
+    // If empty id is provided, clear the current service request
+    if (!id) {
+      setCurrentServiceRequest(null);
+      return;
+    }
+    
     try {
-      setLoading(true);
+      setLoadingDetails(true);
       const serviceRequest = await db.getItemById(id);
       setCurrentServiceRequest(serviceRequest);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch service request'));
     } finally {
-      setLoading(false);
+      setLoadingDetails(false);
     }
   }, []);
 
@@ -111,19 +120,24 @@ export const ServiceRequestProvider: React.FC<ServiceRequestProviderProps> = ({ 
     priority: number
   ): Promise<string | null> => {
     try {
-      // In a real implementation, this would create a new service request in the database
-      // For now, we'll simulate the creation
-      const newId = `ticket-${serviceRequests.length + 1}`;
+      // Generate a unique ticket ID
+      const newId = `ticket-${Math.floor(Math.random() * 10000)}`;
+      
+      // Create a new service request with required fields
       const newServiceRequest: ServiceRequest = {
         id: newId,
+        clientId: message.clientId,
+        clientName: message.clientName,
+        clientEmail: message.clientEmail,
         title: message.subject,
         description: message.content,
         category,
-        priority: priority as ServiceRequest['priority'],
+        priority,
         status: 'New',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         tags: message.category ? [message.category] : [],
+        sourceMessageIds: [message.id], // Add the source message ID
       };
       
       // Update local state
@@ -131,14 +145,14 @@ export const ServiceRequestProvider: React.FC<ServiceRequestProviderProps> = ({ 
       
       // Update message status to 'converted' and link it to the new service request
       await clientMsgDb.updateMessageStatus(message.id, 'converted');
-      await clientMsgDb.assignMessage(message.id, 'relatedServiceId', newId);
+      await clientMsgDb.setRelatedServiceId(message.id, newId);
       
       return newId;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to convert message to service request'));
       return null;
     }
-  }, [serviceRequests]);
+  }, []);
 
   const linkMessageToServiceRequest = useCallback(async (
     messageId: string, 
@@ -147,10 +161,63 @@ export const ServiceRequestProvider: React.FC<ServiceRequestProviderProps> = ({ 
     try {
       // In a real implementation, this would update both the message and service request in the database
       // For now, we'll simulate by updating the client message
-      return await clientMsgDb.assignMessage(messageId, 'relatedServiceId', serviceRequestId);
+      const success = await clientMsgDb.setRelatedServiceId(messageId, serviceRequestId);
+      
+      // Also update the service request to include this message ID in its sourceMessageIds
+      if (success) {
+        // Update local state
+        setServiceRequests(prev => 
+          prev.map(sr => {
+            if (sr.id === serviceRequestId) {
+              const updatedSourceMessageIds = [...(sr.sourceMessageIds || []), messageId];
+              return { 
+                ...sr, 
+                sourceMessageIds: updatedSourceMessageIds,
+                updatedAt: new Date().toISOString() 
+              };
+            }
+            return sr;
+          })
+        );
+        
+        // Update current service request if it's the one being modified
+        if (currentServiceRequest?.id === serviceRequestId) {
+          setCurrentServiceRequest(prev => {
+            if (prev) {
+              const updatedSourceMessageIds = [...(prev.sourceMessageIds || []), messageId];
+              return {
+                ...prev,
+                sourceMessageIds: updatedSourceMessageIds,
+                updatedAt: new Date().toISOString()
+              };
+            }
+            return prev;
+          });
+        }
+      }
+      
+      return success;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to link message to service request'));
       return false;
+    }
+  }, [currentServiceRequest]);
+
+  // New function to regenerate service requests using our dynamic generator
+  const regenerateServiceRequests = useCallback(async (count = 15) => {
+    try {
+      setLoading(true);
+      // Use the regenerateItems method we added to the db class
+      await db.regenerateItems(count);
+      // Fetch the newly generated items
+      const { items } = await db.getItems(1, count);
+      setServiceRequests(items);
+      setCurrentServiceRequest(null); // Reset current service request
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to regenerate service requests'));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -158,6 +225,7 @@ export const ServiceRequestProvider: React.FC<ServiceRequestProviderProps> = ({ 
     serviceRequests,
     currentServiceRequest,
     loading,
+    loadingDetails,
     error,
     fetchServiceRequests,
     fetchServiceRequestById,
@@ -166,6 +234,7 @@ export const ServiceRequestProvider: React.FC<ServiceRequestProviderProps> = ({ 
     getRelatedMessages,
     convertMessageToServiceRequest,
     linkMessageToServiceRequest,
+    regenerateServiceRequests, // Add the new function to the context
   };
 
   return (
@@ -184,4 +253,4 @@ export const useServiceRequest = () => {
 };
 
 // You can use this hook in your components like:
-// const { serviceRequests, fetchServiceRequests } = useServiceRequest();
+// const { serviceRequests, fetchServiceRequests, regenerateServiceRequests } = useServiceRequest();

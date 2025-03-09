@@ -15,22 +15,23 @@ interface MessageThreadProps {
   thread: ThreadType;
   onReply: (threadId: string, message: string) => Promise<void>;
   onArchive: (threadId: string) => Promise<void>;
+  isSubmitting?: boolean;
 }
 
-export function MessageThread({ thread, onReply, onArchive }: MessageThreadProps) {
+export function MessageThread({ thread, onReply, onArchive, isSubmitting = false }: MessageThreadProps) {
   const [replyText, setReplyText] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReplying, setIsReplying] = useState(false);
   const { fetchServiceRequestById, currentServiceRequest } = useServiceRequest();
   
   const handleSubmitReply = async () => {
     if (!replyText.trim()) return;
     
-    setIsSubmitting(true);
+    setIsReplying(true);
     try {
       await onReply(thread.id, replyText);
       setReplyText('');
     } finally {
-      setIsSubmitting(false);
+      setIsReplying(false);
     }
   };
   
@@ -69,7 +70,7 @@ export function MessageThread({ thread, onReply, onArchive }: MessageThreadProps
             <span className="text-sm font-medium text-purple-800">Related Service Request: </span>
             <span className="text-sm">{currentServiceRequest.title}</span>
           </div>
-          <Badge variant={currentServiceRequest.status === 'Resolved' ? 'success' : 'secondary'}>
+          <Badge variant={currentServiceRequest.status === 'Resolved' ? 'outline' : 'secondary'}>
             {currentServiceRequest.status}
           </Badge>
         </div>
@@ -99,7 +100,7 @@ export function MessageThread({ thread, onReply, onArchive }: MessageThreadProps
           <div className="flex justify-end">
             <Button 
               onClick={handleSubmitReply}
-              disabled={!replyText.trim() || isSubmitting}
+              disabled={!replyText.trim() || isSubmitting || isReplying}
             >
               <Send className="h-4 w-4 mr-1" />
               Send Reply

@@ -8,13 +8,13 @@ export interface ServiceRequest {
   clientId: string;
   clientName: string;
   clientEmail: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
   category: string;
-  priority: 1 | 2 | 3 | 4 | 5;
+  priority: number; // Accepts any number but recommended to use 1-5 scale
   status: 'New' | 'In Progress' | 'Waiting on Client' | 'Resolved';
   assignedTo?: string;
-  dueDate?: string;
+  dueDate?: string | Date;
   estimatedHours?: number;
   actualHours?: number;
   isInvoiced?: boolean;

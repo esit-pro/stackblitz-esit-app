@@ -501,12 +501,9 @@ class ClientMessagesDatabase {
     let filteredMessages = this.clientMessages;
     if (filter) {
       filteredMessages = this.clientMessages.filter((message) => {
-        for (const [key, value] of Object.entries(filter)) {
-          if (message[key] !== value) {
-            return false;
-          }
-        }
-        return true;
+        return Object.entries(filter).every(([key, value]) => {
+          return message[key as keyof ClientMessage] === value;
+        });
       });
     }
 
@@ -556,7 +553,7 @@ class ClientMessagesDatabase {
     return thread || null;
   }
 
-  async markMessageAsRead(id: string, delay = 200): Promise<boolean> {
+  async markMessageAsRead(id: string, assignedBy: string = 'system', delay = 200): Promise<boolean> {
     // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, delay));
 
@@ -607,13 +604,25 @@ class ClientMessagesDatabase {
     return false;
   }
 
-  async assignMessage(id: string, field: string, value: string, delay = 300): Promise<boolean> {
+  async assignMessage(id: string, assignedTo: string, delay = 300): Promise<boolean> {
     // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, delay));
 
     const message = this.clientMessages.find((message) => message.id === id);
     if (message) {
-      message[field] = value;
+      message.assignedTo = assignedTo;
+      return true;
+    }
+    return false;
+  }
+
+  async setRelatedServiceId(id: string, relatedServiceId: string, delay = 300): Promise<boolean> {
+    // Simulate network delay
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    const message = this.clientMessages.find((message) => message.id === id);
+    if (message) {
+      message.relatedServiceId = relatedServiceId;
       return true;
     }
     return false;

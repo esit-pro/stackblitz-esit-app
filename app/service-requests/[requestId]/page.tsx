@@ -1,19 +1,18 @@
-import { ItemDetail } from '@/components/items/item-detail';
-import { useServiceRequests } from '@/hooks/use-service-requests';
+"use client";
+
 import { notFound } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow, format } from 'date-fns';
+import { useServiceRequest, ServiceRequestProvider } from '@/components/service-request/service-request-context';
+import { Suspense } from 'react';
 
-// Make this a client component to use hooks
-('use client');
-
-export default function ServiceRequestDetailPage({
+function ServiceRequestDetailPageContent({
   params,
 }: {
   params: { requestId: string };
 }) {
-  const { requests, updateStatus, updatePriority } = useServiceRequests();
+  const { serviceRequests: requests } = useServiceRequest();
   const request = requests.find((req) => req.id === params.requestId);
 
   // If service request not found, show 404
@@ -28,27 +27,27 @@ export default function ServiceRequestDetailPage({
     3: 'Medium',
     4: 'High',
     5: 'Critical',
-  }[request.priority];
+  }[request.priority as 1 | 2 | 3 | 4 | 5];
 
   // Calculate priority color
   const priorityColor = {
-    1: 'bg-blue-100 text-blue-800',
+    1: 'bg-muted text-muted-foreground',
     2: 'bg-green-100 text-green-800',
     3: 'bg-yellow-100 text-yellow-800',
     4: 'bg-orange-100 text-orange-800',
-    5: 'bg-red-100 text-red-800',
-  }[request.priority];
+    5: 'bg-destructive text-destructive-foreground',
+  }[request.priority as 1 | 2 | 3 | 4 | 5];
 
   // Calculate status color
   const statusColor = {
     New: 'bg-purple-100 text-purple-800',
-    'In Progress': 'bg-blue-100 text-blue-800',
+    'In Progress': 'bg-primary text-primary-foreground',
     'Waiting on Client': 'bg-yellow-100 text-yellow-800',
     Resolved: 'bg-green-100 text-green-800',
-  }[request.status];
+  }[request.status as 'New' | 'In Progress' | 'Waiting on Client' | 'Resolved'];
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container max-w-7xl mx-auto py-6 px-4">
       <div className="mb-6">
         <a
           href="/service-requests"
@@ -174,7 +173,7 @@ export default function ServiceRequestDetailPage({
           <div>
             <h3 className="text-lg font-medium mb-2">Tags</h3>
             <div className="flex flex-wrap gap-2">
-              {request.tags.map((tag) => (
+              {request.tags.map((tag: string) => (
                 <Badge key={tag} variant="outline" className="capitalize">
                   {tag}
                 </Badge>
@@ -203,7 +202,7 @@ export default function ServiceRequestDetailPage({
             </CardHeader>
             <CardContent>
               <ul className="list-disc pl-5">
-                {request.sourceMessageIds.map((messageId) => (
+                {request.sourceMessageIds && request.sourceMessageIds.map((messageId: string) => (
                   <li key={messageId}>
                     <a
                       href={`/messages/${messageId}`}
@@ -219,5 +218,15 @@ export default function ServiceRequestDetailPage({
         )}
       </div>
     </div>
+  );
+}
+
+export default function ServiceRequestDetailPage({ params }: { params: { requestId: string } }) {
+  return (
+    <Suspense fallback={<div className="container max-w-7xl mx-auto py-6 px-4">Loading service request...</div>}>
+      <ServiceRequestProvider>
+        <ServiceRequestDetailPageContent params={params} />
+      </ServiceRequestProvider>
+    </Suspense>
   );
 }

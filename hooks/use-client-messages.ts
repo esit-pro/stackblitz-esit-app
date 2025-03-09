@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ClientMessage, clientMsgDb } from '../lib/client-messages-db';
-const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
 
 export function useClientMessages() {
   const [messages, setMessages] = useState<ClientMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
 
 
 
@@ -32,9 +32,9 @@ export function useClientMessages() {
     fetchMessages();
   }, [fetchMessages]);
 
-  const markAsRead = useCallback(async (id: string) => {
+  const markAsRead = useCallback(async (id: string, assignedBy: string = 'system') => {
     try {
-      const success = await clientMsgDb.markMessageAsRead(id, 'assignedTo', assignedTo );
+      const success = await clientMsgDb.markMessageAsRead(id, assignedBy);
       if (success) {
         setMessages(prev => 
           prev.map(msg => 
@@ -105,6 +105,42 @@ export function useClientMessages() {
     fetchMessages();
   }, [fetchMessages]);
 
+  const toggleMessageSelection = useCallback((id: string) => {
+    setSelectedMessages(prev => 
+      prev.includes(id)
+        ? prev.filter(msgId => msgId !== id)
+        : [...prev, id]
+    );
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedMessages([]);
+  }, []);
+
+  const archiveMessages = useCallback(async (ids: string[]) => {
+    try {
+      const promises = ids.map(id => updateStatus(id, 'archived'));
+      await Promise.all(promises);
+      clearSelection();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to archive messages'));
+      return false;
+    }
+  }, [updateStatus]);
+
+  const deleteMessages = useCallback(async (ids: string[]) => {
+    try {
+      const promises = ids.map(id => updateStatus(id, 'deleted'));
+      await Promise.all(promises);
+      clearSelection();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to delete messages'));
+      return false;
+    }
+  }, [updateStatus]);
+
   return {
     messages,
     loading,
@@ -112,8 +148,12 @@ export function useClientMessages() {
     unreadCount,
     markAsRead,
     flagMessage,
-    updateStatus,
     assignMessage,
     refreshMessages,
+    selectedMessages,
+    toggleMessageSelection,
+    clearSelection,
+    archiveMessages,
+    deleteMessages,
   };
 }

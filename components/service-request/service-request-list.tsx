@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Filter,
   Search,
@@ -13,11 +13,10 @@ import {
   Clock,
   Tag,
   MoreHorizontal,
-  ChevronDown,
+  RefreshCw,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
-import { ServiceRequest } from '@/models/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
@@ -27,8 +26,168 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useServiceRequest } from '@/hooks/use-service-requests';
-import { useServiceRequest as useServiceRequestContext } from '@/components/service-request/service-request-context';
+import { useServiceRequest } from '@/components/service-request/service-request-context';
+import { ServiceRequest } from '@/hooks/use-service-requests';
+
+// Map status to color scheme for theme compatibility
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'New':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+    case 'In Progress':
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+    case 'Waiting on Client':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+    case 'Resolved':
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+  }
+};
+
+// Map priority to color and label with theme compatibility
+const getPriorityInfo = (priority: number) => {
+  switch (priority) {
+    case 5:
+      return { color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', label: 'Highest' };
+    case 4:
+      return { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', label: 'High' };
+    case 3:
+      return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', label: 'Medium' };
+    case 2:
+      return { color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', label: 'Low' };
+    case 1:
+      return { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', label: 'Lowest' };
+    default:
+      return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200', label: 'Medium' };
+  }
+};
+
+// Define the RequestSkeleton component before it's used
+function RequestSkeleton() {
+  return (
+    <div className="px-4 py-3 animate-pulse">
+      <div className="flex items-start gap-3">
+        <div className="flex items-center mt-1 space-x-2">
+          <div className="h-4 w-4 rounded-sm bg-muted"></div>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between">
+            <div className="w-1/3 h-4 bg-muted rounded"></div>
+            <div className="w-1/5 h-5 bg-muted rounded"></div>
+          </div>
+
+          <div className="w-1/4 h-3 bg-muted rounded mt-1"></div>
+          <div className="w-full h-4 bg-muted rounded mt-3"></div>
+          <div className="w-3/4 h-4 bg-muted rounded mt-1"></div>
+
+          <div className="flex mt-3 gap-2">
+            <div className="w-16 h-5 bg-muted rounded"></div>
+            <div className="w-16 h-5 bg-muted rounded"></div>
+            <div className="w-32 h-5 bg-muted rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ServiceRequestDetails component definition
+const ServiceRequestDetails = ({ serviceRequest }: { serviceRequest: ServiceRequest | null }) => {
+  // If serviceRequest is null, don't render anything
+  if (!serviceRequest) return null;
+  
+  return (
+    <div className="p-6">
+      <h2 className="text-2xl font-bold mb-4">{serviceRequest.title}</h2>
+      
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium mb-2">Description</h3>
+          <p className="text-muted-foreground">{serviceRequest.description}</p>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h4 className="text-sm font-medium mb-1">Client</h4>
+            <p>{serviceRequest.clientName}</p>
+            <p className="text-sm text-muted-foreground">{serviceRequest.clientEmail}</p>
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-medium mb-1">Status</h4>
+            <Badge className={getStatusColor(serviceRequest.status)}>
+              {serviceRequest.status}
+            </Badge>
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-medium mb-1">Priority</h4>
+            <Badge variant="outline" className={getPriorityInfo(serviceRequest.priority).color}>
+              P{serviceRequest.priority}: {getPriorityInfo(serviceRequest.priority).label}
+            </Badge>
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-medium mb-1">Category</h4>
+            <Badge variant="secondary">{serviceRequest.category}</Badge>
+          </div>
+        </div>
+
+        <div className="pt-4 border-t">
+          <h3 className="text-lg font-medium mb-2">Details</h3>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium mb-1">Created</h4>
+                <p className="text-sm flex items-center">
+                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                  {formatDistanceToNow(new Date(serviceRequest.createdAt), {
+                    addSuffix: true,
+                  })}
+                </p>
+              </div>
+              
+              {serviceRequest.dueDate && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Due</h4>
+                  <p className="text-sm flex items-center">
+                    <Clock className="h-3.5 w-3.5 mr-1" />
+                    {formatDistanceToNow(new Date(serviceRequest.dueDate as string), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                </div>
+              )}
+              
+              {serviceRequest.assignedTo && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Assigned To</h4>
+                  <p className="text-sm">{serviceRequest.assignedTo}</p>
+                </div>
+              )}
+            </div>
+            
+            {serviceRequest.tags && serviceRequest.tags.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-1">Tags</h4>
+                <div className="flex flex-wrap gap-1">
+                  {serviceRequest.tags.map((tag: string) => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export function ServiceRequestList() {
   const [filter, setFilter] = useState<
@@ -38,10 +197,38 @@ export function ServiceRequestList() {
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
 
   // Use the service request context
-  const { handleItemSelect, selectedItemId } = useServiceRequestContext();
+  const { 
+    serviceRequests, 
+    loading: isLoading, 
+    loadingDetails,
+    error,
+    fetchServiceRequests,
+    regenerateServiceRequests,
+    currentServiceRequest,
+    fetchServiceRequestById
+  } = useServiceRequest();
 
-  // Use the service request hook for data
-  const { serviceRequests, isLoading } = useServiceRequest();
+  // Handler for selecting a service request
+  const handleItemSelect = (request: ServiceRequest) => {
+    setSelectedRequests([]);
+    
+    // If the same request is clicked again, deselect it
+    if (currentServiceRequest && currentServiceRequest.id === request.id) {
+      // Set current service request to null by loading an empty ID
+      // This effectively clears the current service request
+      fetchServiceRequestById(''); // This will cause the current request to be cleared
+    } else {
+      fetchServiceRequestById(request.id);
+    }
+  };
+
+  // Selected item ID derived from current service request
+  const selectedItemId = currentServiceRequest?.id;
+
+  // Load service requests on component mount
+  useEffect(() => {
+    fetchServiceRequests();
+  }, [fetchServiceRequests]);
 
   // Filter service requests based on current filter and search term
   const filteredRequests = serviceRequests.filter((request) => {
@@ -87,38 +274,44 @@ export function ServiceRequestList() {
     }
   };
 
-  // Map status to color scheme
+  // Map status to color scheme for theme compatibility
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'New':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'In Progress':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       case 'Waiting on Client':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       case 'Resolved':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
-  // Map priority to color and label
+  // Map priority to color and label with theme compatibility
   const getPriorityInfo = (priority: number) => {
     switch (priority) {
       case 5:
-        return { color: 'bg-red-100 text-red-800', label: 'Highest' };
+        return { color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', label: 'Highest' };
       case 4:
-        return { color: 'bg-orange-100 text-orange-800', label: 'High' };
+        return { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', label: 'High' };
       case 3:
-        return { color: 'bg-yellow-100 text-yellow-800', label: 'Medium' };
+        return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', label: 'Medium' };
       case 2:
-        return { color: 'bg-green-100 text-green-800', label: 'Low' };
+        return { color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', label: 'Low' };
       case 1:
-        return { color: 'bg-blue-100 text-blue-800', label: 'Lowest' };
+        return { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', label: 'Lowest' };
       default:
-        return { color: 'bg-gray-100 text-gray-800', label: 'Medium' };
+        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200', label: 'Medium' };
     }
+  };
+
+  // Handle regenerating service requests
+  const handleRegenerateRequests = async () => {
+    setSelectedRequests([]); // Clear selections
+    await regenerateServiceRequests();
   };
 
   return (
@@ -127,10 +320,21 @@ export function ServiceRequestList() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Service Requests</h2>
 
-          <Button>
-            <Plus className="h-4 w-4 mr-1" />
-            New Request
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              size="icon"
+              onClick={handleRegenerateRequests}
+              disabled={isLoading}
+              title="Regenerate requests with random data"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-1" />
+              New Request
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-2">
@@ -180,7 +384,7 @@ export function ServiceRequestList() {
             checked={selectedRequests.length === filteredRequests.length}
             onCheckedChange={toggleSelectAll}
           />
-          <span className="text-sm">{selectedRequests.length} selected</span>
+          <span className="text-sm text-foreground">{selectedRequests.length} selected</span>
           <div className="flex-1"></div>
           <Button size="sm" variant="outline">
             Assign
@@ -194,45 +398,66 @@ export function ServiceRequestList() {
         </div>
       )}
 
-      <ScrollArea className="flex-1">
-        <div className="divide-y">
-          {isLoading ? (
-            // Loading skeletons
-            Array.from({ length: 5 }).map((_, i) => <RequestSkeleton key={i} />)
-          ) : filteredRequests.length === 0 ? (
-            // Empty state
-            <div className="p-8 text-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-8 w-8 mx-auto text-muted-foreground"
-              >
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-                <line x1="2" y1="10" x2="22" y2="10" />
-              </svg>
-              <h3 className="mt-2 font-medium">No service requests found</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {searchTerm
-                  ? 'Try adjusting your search terms'
-                  : filter !== 'all'
-                  ? `No ${filter} service requests`
-                  : 'No service requests available'}
-              </p>
-            </div>
-          ) : (
-            // Request list
-            filteredRequests.map((request) => (
-              <div
-                key={request.id}
-                className={`hover:bg-muted/50 transition-colors ${
-                  request.id === selectedItemId ? 'bg-muted' : ''
-                }`}
-              >
+      {/* Error state */}
+      {error && (
+        <div className="p-4 text-center text-red-500">
+          <p>Error: {error.message}</p>
+          <Button 
+            onClick={() => fetchServiceRequests()} 
+            variant="outline" 
+            size="sm"
+            className="mt-2"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Main content area with list and details pane */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Service request list - transitions width using CSS */}
+        <div 
+          className={`overflow-hidden ${currentServiceRequest ? 'w-[60%]' : 'w-full'} transition-all duration-300 ease-in-out`}
+        >
+          <ScrollArea className="h-full border-r">
+            <div className="divide-y">
+            {isLoading ? (
+              // Loading skeletons
+              Array.from({ length: 5 }).map((_, i) => <RequestSkeleton key={i} />)
+            ) : filteredRequests.length === 0 ? (
+              // Empty state
+              <div className="p-8 text-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-8 w-8 mx-auto text-muted-foreground"
+                >
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
+                <h3 className="mt-2 font-medium text-foreground">No service requests found</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {searchTerm
+                    ? 'Try adjusting your search terms'
+                    : filter !== 'all'
+                    ? `No ${filter} service requests`
+                    : 'No service requests available'}
+                </p>
+              </div>
+            ) : (
+              // Request list
+              filteredRequests.map((request: ServiceRequest) => (
+                <div
+                  key={request.id}
+                  className={`hover:bg-muted/50 transition-colors ${
+                    request.id === selectedItemId ? 'bg-muted/80' : ''
+                  }`}
+                >
                 <div className="px-4 py-3">
                   <div className="flex items-start gap-3">
                     <div className="flex items-center mt-1 space-x-2">
@@ -251,7 +476,7 @@ export function ServiceRequestList() {
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h3 className="font-medium">{request.title}</h3>
+                          <h3 className="font-medium text-foreground">{request.title}</h3>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Client: {request.clientName} ({request.clientEmail})
                           </p>
@@ -336,7 +561,7 @@ export function ServiceRequestList() {
                           <div className="flex items-center gap-1">
                             <Tag className="h-3.5 w-3.5 text-muted-foreground" />
                             <div className="flex gap-1">
-                              {request.tags.slice(0, 2).map((tag) => (
+                              {request.tags.slice(0, 2).map((tag: string) => (
                                 <span key={tag} className="text-xs">
                                   {tag}
                                 </span>
@@ -354,37 +579,37 @@ export function ServiceRequestList() {
                   </div>
                 </div>
               </div>
-            ))
-          )}
+              ))
+            )}
+          
+            </div>
+          </ScrollArea>
         </div>
-      </ScrollArea>
-    </div>
-  );
-}
-
-function RequestSkeleton() {
-  return (
-    <div className="px-4 py-3 animate-pulse">
-      <div className="flex items-start gap-3">
-        <div className="flex items-center mt-1 space-x-2">
-          <div className="h-4 w-4 rounded-sm bg-muted"></div>
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
-            <div className="w-1/3 h-4 bg-muted rounded"></div>
-            <div className="w-1/5 h-5 bg-muted rounded"></div>
-          </div>
-
-          <div className="w-1/4 h-3 bg-muted rounded mt-1"></div>
-          <div className="w-full h-4 bg-muted rounded mt-3"></div>
-          <div className="w-3/4 h-4 bg-muted rounded mt-1"></div>
-
-          <div className="flex mt-3 gap-2">
-            <div className="w-16 h-5 bg-muted rounded"></div>
-            <div className="w-16 h-5 bg-muted rounded"></div>
-            <div className="w-32 h-5 bg-muted rounded"></div>
-          </div>
+      
+        {/* Service request details pane - slides in when a request is selected using CSS */}
+        <div 
+          className={`w-[40%] min-w-[350px] overflow-auto border-l transform transition-all duration-300 ease-in-out ${currentServiceRequest ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none absolute right-0'}`}
+        >
+              {loadingDetails ? (
+                <div className="p-6 space-y-4">
+                  <div className="h-8 w-3/4 bg-muted/60 rounded animate-pulse"></div>
+                  <div className="h-4 w-full bg-muted/60 rounded animate-pulse"></div>
+                  <div className="h-4 w-full bg-muted/60 rounded animate-pulse"></div>
+                  <div className="h-4 w-2/3 bg-muted/60 rounded animate-pulse"></div>
+                  <div className="grid grid-cols-2 gap-4 mt-6">
+                    <div className="space-y-2">
+                      <div className="h-3 w-20 bg-muted/60 rounded animate-pulse"></div>
+                      <div className="h-4 w-32 bg-muted/60 rounded animate-pulse"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-3 w-20 bg-muted/60 rounded animate-pulse"></div>
+                      <div className="h-6 w-24 bg-muted/60 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <ServiceRequestDetails serviceRequest={currentServiceRequest} />
+              )}
         </div>
       </div>
     </div>
