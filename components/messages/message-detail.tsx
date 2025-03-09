@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useClientMessages } from '@/hooks/use-client-messages';
 import {
   Card,
@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ClientMessage } from '@/models/types';
+import { ClientMessage, MessageThread } from '@/lib/db';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -55,24 +55,47 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface MessageDetailProps {
-  message: ClientMessage | null;
+  message: ClientMessage;
   onBack?: () => void;
   onNavigate?: (direction: 'prev' | 'next') => void;
 }
 
-export function MessageDetail({ message }: { message: ClientMessage }) {
+export function MessageDetail({ message, onBack, onNavigate }: MessageDetailProps) {
+  // State for UI
+  const [replyText, setReplyText] = useState('');
+  const [currentTab, setCurrentTab] = useState<'thread' | 'details'>('thread');
+  const [isCreatingServiceRequest, setIsCreatingServiceRequest] = useState(false);
+  const [serviceTitle, setServiceTitle] = useState(message?.subject || '');
+  const [serviceCategory, setServiceCategory] = useState('');
+  const [servicePriority, setServicePriority] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [thread, setThread] = useState<MessageThread | null>(null);
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
+
+  // Get client messages hook
   const {
-    messages,
-    markAsRead,
-    updateStatus,
-    toggleFlag,
+    flagMessage,
+    archiveMessages,
+    deleteMessages,
+    getMessageThread,
+    sendReply,
+    createServiceRequest
   } = useClientMessages();
 
-
-  // Get the message thread if available
-  const thread = useMemo(() => {
-    if (!message) return null;
-    return getMessageThread(message.id);
+  // Load thread data when message changes
+  useEffect(() => {
+    if (message) {
+      setIsLoadingThread(true);
+      getMessageThread(message.id)
+        .then(threadData => {
+          setThread(threadData);
+        })
+        .catch(error => {
+          console.error('Error loading thread:', error);
+        })
+        .finally(() => {
+          setIsLoadingThread(false);
+        });
+    }
   }, [message, getMessageThread]);
 
   if (!message) {
@@ -89,25 +112,60 @@ export function MessageDetail({ message }: { message: ClientMessage }) {
     );
   }
 
-  const handleSendReply = () => {
+  const handleSendReply = async () => {
     if (!replyText.trim()) return;
 
-    sendReply(message.id, replyText);
-    setReplyText('');
+    try {
+      await sendReply(message.id, replyText);
+      setReplyText('');
+      
+      // Refresh thread data
+      const updatedThread = await getMessageThread(message.id);
+      setThread(updatedThread);
+    } catch (error) {
+      console.error('Error sending reply:', error);
+    }
   };
 
-  const handleCreateServiceRequest = () => {
+  const handleCreateServiceRequest = async () => {
     if (!serviceTitle.trim()) return;
 
-    createServiceRequest([message.id], {
-      title: serviceTitle,
-      category: serviceCategory,
-      priority: servicePriority,
-    });
+    try {
+      await createServiceRequest([message.id], {
+        title: serviceTitle,
+        category: serviceCategory,
+        priority: servicePriority,
+      });
 
-    setIsCreatingServiceRequest(false);
+      setIsCreatingServiceRequest(false);
+    } catch (error) {
+      console.error('Error creating service request:', error);
+    }
+  };
 
-    // In a real app, this might navigate to the new service request
+  const handleFlagMessage = async () => {
+    try {
+      await flagMessage(message.id, !message.isFlagged);
+    } catch (error) {
+      console.error('Error flagging message:', error);
+    }
+  };
+
+  const handleArchiveMessage = async () => {
+    try {
+      await archiveMessages([message.id]);
+    } catch (error) {
+      console.error('Error archiving message:', error);
+    }
+  };
+
+  const handleDeleteMessage = async () => {
+    try {
+      await deleteMessages([message.id]);
+      onBack?.();
+    } catch (error) {
+      console.error('Error deleting message:', error);
+    }
   };
 
   // Format dates
@@ -198,25 +256,20 @@ export function MessageDetail({ message }: { message: ClientMessage }) {
                         Create Service Request
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() =>
-                          flagMessage(message.id, !message.isFlagged)
-                        }
+                        onClick={handleFlagMessage}
                       >
                         <Flag className="h-4 w-4 mr-2" />
                         {message.isFlagged ? 'Remove Flag' : 'Flag Message'}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={() => archiveMessages([message.id])}
+                        onClick={handleArchiveMessage}
                       >
                         <Archive className="h-4 w-4 mr-2" />
                         Archive
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          deleteMessages([message.id]);
-                          onBack?.();
-                        }}
+                        onClick={handleDeleteMessage}
                         className="text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -295,8 +348,18 @@ export function MessageDetail({ message }: { message: ClientMessage }) {
                 </CardContent>
               </Card>
 
+              {/* Loading state for thread */}
+              {isLoadingThread && (
+                <div className="flex justify-center py-4">
+                  <div className="text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                    <p className="text-sm text-muted-foreground mt-2">Loading conversation thread...</p>
+                  </div>
+                </div>
+              )}
+
               {/* Message thread if there are replies */}
-              {thread && thread.messages.length > 1 && (
+              {!isLoadingThread && thread && thread.messages.length > 1 && (
                 <>
                   <div className="relative pl-6 border-l-2 border-border my-6">
                     <div className="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-sm text-muted-foreground">
@@ -319,8 +382,6 @@ export function MessageDetail({ message }: { message: ClientMessage }) {
                             <CardHeader className="p-3 pb-0">
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                  // Continuing from the previous code,
-                                  completing the message-detail.tsx component:
                                   <Avatar className="h-6 w-6">
                                     <AvatarImage
                                       src={

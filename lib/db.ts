@@ -1,277 +1,696 @@
-import { z } from 'zod';
+"use client"
 
-// Define schemas for IT service request data
-export const ItemSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  description: z.string(),
-  imageUrl: z.string().optional(),
-  createdAt: z.string().or(z.date()),
-  updatedAt: z.string().or(z.date()),
-  category: z.string(), // Service category
-  tags: z.array(z.string()).optional(),
-  priority: z.number().optional(), // 1-5 scale, 5 being highest
-  status: z.string().optional(), // New, In Progress, Waiting on Client, Resolved
-});
+import { useEffect, useState } from 'react';
+import { useClientMessages } from '@/hooks/use-client-messages';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Archive,
+  Trash2,
+  Flag,
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Plane as PaperPlane,
+  ArrowLeft,
+  FileText,
+  Paperclip,
+  Calendar,
+  PlusCircle,
+} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { formatDistanceToNow, format } from 'date-fns';
+import { ClientMessage, MessageThread } from '@/lib/db';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-export type Item = z.infer<typeof ItemSchema>;
-
-// Mock database service with fixed IT service requests
-class Database {
-  private items: Item[] = [];
-
-  constructor() {
-    // Initialize with exactly 15 fixed IT service requests
-    this.initializeFixedItems();
-  }
-
-  private initializeFixedItems() {
-    const now = new Date();
-
-    // Define all 15 fixed IT service request items
-    this.items = [
-      {
-        id: 'ticket-1',
-        title: 'Network Outage in Accounting Department',
-        description:
-          'The accounting department is experiencing a complete network outage affecting 8 workstations. Users cannot access shared drives or internet. Started approximately 30 minutes ago.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Network',
-        tags: ['outage', 'critical', 'accounting'],
-        priority: 5,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-2',
-        title: 'Email Configuration for New Employee',
-        description:
-          'New marketing coordinator Jane Smith starts on Monday. Please set up email account, add to appropriate distribution lists, and configure on her laptop.',
-        category: 'User Management',
-        tags: ['new-hire', 'email', 'onboarding'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 1 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 1 day ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-3',
-        title: 'Printer Offline in Conference Room',
-        description:
-          'The HP LaserJet in the main conference room is showing offline status. Cannot print documents for client meeting scheduled at 2pm today.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Hardware',
-        tags: ['printer', 'conference-room'],
-        priority: 4,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-4',
-        title: 'VPN Access for Remote Worker',
-        description:
-          'Developer Tom Johnson needs VPN access set up for remote work starting next week. He will be working from home permanently and needs full access to development servers.',
-        category: 'Security',
-        tags: ['vpn', 'remote-work', 'access'],
-        priority: 3,
-        status: 'Waiting on Client',
-        createdAt: new Date(
-          now.getTime() - 2 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 2 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-5',
-        title: 'CRM Software Crashing on Sales Team Computers',
-        description:
-          "Multiple sales team members reporting CRM application crashes when generating reports. Error log attached. Issue began after yesterday's software update.",
-        imageUrl:
-          'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Software',
-        tags: ['crm', 'crash', 'sales'],
-        priority: 4,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 18 * 60 * 60 * 1000).toISOString(), // 18 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-6',
-        title: 'Server Room A/C Maintenance',
-        description:
-          "Schedule preventive maintenance for server room air conditioning system. Last service was 6 months ago, and we're observing slightly higher temperatures than normal.",
-        category: 'Facilities',
-        tags: ['server-room', 'maintenance', 'cooling'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 5 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 5 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-7',
-        title: 'Windows Update Breaking Custom Application',
-        description:
-          'Recent Windows security update KB5025885 is causing our inventory tracking application to fail at startup. Affects 3 warehouse computers. Need rollback or fix ASAP.',
-        category: 'Software',
-        tags: ['windows', 'update', 'compatibility'],
-        priority: 4,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 36 * 60 * 60 * 1000).toISOString(), // 36 hours ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-8',
-        title: 'Backup Recovery Test',
-        description:
-          "Quarterly backup recovery test needed. Please restore last week's accounting database backup to test environment and verify data integrity.",
-        category: 'Data Management',
-        tags: ['backup', 'testing', 'compliance'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 3 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 3 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-9',
-        title: 'CEO Laptop Replacement',
-        description:
-          'CEO needs new laptop prepared before international trip next week. Transfer all data, email, and applications from current device. High-priority executive request.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1593642702749-b7d2a804fbcf?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Hardware',
-        tags: ['executive', 'laptop', 'migration'],
-        priority: 5,
-        status: 'In Progress',
-        createdAt: new Date(
-          now.getTime() - 4 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 4 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-10',
-        title: 'WiFi Signal Weak in East Wing',
-        description:
-          'Multiple complaints about poor WiFi connectivity in east wing offices. Signal drops frequently and speeds are below acceptable levels for video conferencing.',
-        category: 'Network',
-        tags: ['wifi', 'connectivity', 'signal'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 7 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 7 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-11',
-        title: 'Phishing Training for Accounting Team',
-        description:
-          'Schedule security awareness and phishing identification training for accounting department following recent attempt. Need 1-hour slot for 12 employees.',
-        category: 'Security',
-        tags: ['training', 'phishing', 'security'],
-        priority: 2,
-        status: 'Waiting on Client',
-        createdAt: new Date(
-          now.getTime() - 10 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 10 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-12',
-        title: 'Office 365 License Renewal',
-        description:
-          'Our Office 365 Business Premium licenses expire in 30 days. Please process renewal for 75 users and confirm updated billing with finance department.',
-        category: 'Licensing',
-        tags: ['office365', 'renewal', 'licenses'],
-        priority: 3,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 6 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 6 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-13',
-        title: 'Conference Room Video System Not Working',
-        description:
-          'Video conferencing system in main boardroom not connecting to calls. External clients unable to join scheduled demo at 9am. System was working yesterday.',
-        imageUrl:
-          'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        category: 'Hardware',
-        tags: ['conference', 'video', 'urgent'],
-        priority: 5,
-        status: 'In Progress',
-        createdAt: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-14',
-        title: 'Data Migration to New CRM',
-        description:
-          'Plan and schedule customer data migration from legacy CRM to new Salesforce instance. Approximately 50,000 customer records and associated history need transfer.',
-        category: 'Data Management',
-        tags: ['migration', 'crm', 'salesforce'],
-        priority: 4,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 14 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 14 days ago
-        updatedAt: now.toISOString(),
-      },
-      {
-        id: 'ticket-15',
-        title: 'Shared Drive Permissions Audit',
-        description:
-          'Conduct audit of permissions on all shared network drives following department reorganization. Ensure proper access controls and remove permissions for departed employees.',
-        category: 'Security',
-        tags: ['audit', 'permissions', 'compliance'],
-        priority: 2,
-        status: 'New',
-        createdAt: new Date(
-          now.getTime() - 21 * 24 * 60 * 60 * 1000
-        ).toISOString(), // 21 days ago
-        updatedAt: now.toISOString(),
-      },
-    ];
-  }
-
-  async getItems(
-    page = 1,
-    limit = 10,
-    delay = 500
-  ): Promise<{ items: Item[]; total: number; hasMore: boolean }> {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, delay));
-
-    // Limit to max 20 items total
-    const maxItems = Math.min(this.items.length, 20);
-    const start = (page - 1) * limit;
-    const end = Math.min(start + limit, maxItems);
-    const items = this.items.slice(start, end);
-
-    return {
-      items,
-      total: maxItems,
-      hasMore: end < maxItems,
-    };
-  }
-
-  async getItemById(id: string, delay = 300): Promise<Item | null> {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, delay));
-
-    const item = this.items.find((item) => item.id === id);
-    return item || null;
-  }
+interface MessageDetailProps {
+  message: ClientMessage;
+  onBack?: () => void;
+  onNavigate?: (direction: 'prev' | 'next') => void;
 }
 
-// Export singleton instance
-export const db = new Database();
+export function MessageDetail({ message, onBack, onNavigate }: MessageDetailProps) {
+  // Format dates
+  const receivedDate = new Date(message.received);
+  const receivedTimeAgo = formatDistanceToNow(receivedDate, {
+    addSuffix: true,
+  });
+  // State for UI
+  const [replyText, setReplyText] = useState('');
+  const [currentTab, setCurrentTab] = useState<'thread' | 'details'>('thread');
+  const [isCreatingServiceRequest, setIsCreatingServiceRequest] = useState(false);
+  const [serviceTitle, setServiceTitle] = useState(message?.subject || '');
+  const [serviceCategory, setServiceCategory] = useState('');
+  const [servicePriority, setServicePriority] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [thread, setThread] = useState<MessageThread | null>(null);
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
+
+  // Get client messages hook
+  const {
+    flagMessage,
+    archiveMessages,
+    deleteMessages,
+    getMessageThread,
+    sendReply,
+    createServiceRequest
+  } = useClientMessages();
+
+  // Load thread data when message changes
+  useEffect(() => {
+    if (message) {
+      setIsLoadingThread(true);
+      getMessageThread(message.id)
+        .then(threadData => {
+          setThread(threadData);
+        })
+        .catch(error => {
+          console.error('Error loading thread:', error);
+        })
+        .finally(() => {
+          setIsLoadingThread(false);
+        });
+    }
+  }, [message, getMessageThread]);
+
+  if (!message) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center p-8">
+          <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
+          <h3 className="mt-4 text-lg font-medium">No message selected</h3>
+          <p className="text-muted-foreground mt-2">
+            Select a message from the list to view
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) return;
+
+    try {
+      await sendReply(message.id, replyText);
+      setReplyText('');
+      
+      // Refresh thread data
+      const updatedThread = await getMessageThread(message.id);
+      setThread(updatedThread);
+    } catch (error) {
+      console.error('Error sending reply:', error);
+    }
+  };
+
+  const handleCreateServiceRequest = async () => {
+    if (!serviceTitle.trim()) return;
+
+    try {
+      await createServiceRequest([message.id], {
+        title: serviceTitle,
+        category: serviceCategory,
+        priority: servicePriority,
+      });
+
+      setIsCreatingServiceRequest(false);
+    } catch (error) {
+      console.error('Error creating service request:', error);
+    }
+  };
+
+  const handleFlagMessage = async () => {
+    try {
+      await flagMessage(message.id, !message.isFlagged);
+    } catch (error) {
+      console.error('Error flagging message:', error);
+    }
+  };
+
+  const handleArchiveMessage = async () => {
+    try {
+      await archiveMessages([message.id]);
+    } catch (error) {
+      console.error('Error archiving message:', error);
+    }
+  };
+
+  const handleDeleteMessage = async () => {
+    try {
+      await deleteMessages([message.id]);
+      onBack?.();
+    } catch (error) {
+      console.error('Error deleting message:', error);
+    }
+  };
+
+  // Format dates
+  const receivedDate = new Date(message.received);
+  const receivedTimeAgo = formatDistanceToNow(receivedDate, {
+    addSuffix: true,
+  });
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="p-4 border-b flex items-center justify-between">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={onBack} className="mr-2">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h2 className="text-lg font-semibold">Message Detail</h2>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onNavigate?.('prev')}
+            disabled={!onNavigate}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onNavigate?.('next')}
+            disabled={!onNavigate}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-4">
+          {/* Message header with client info */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        message.clientName
+                      )}&background=random`}
+                    />
+                    <AvatarFallback>
+                      {message.clientName
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div>
+                    <CardTitle className="text-lg">{message.subject}</CardTitle>
+                    <CardDescription className="mt-1">
+                      From: {message.clientName} &lt;{message.clientEmail}&gt;
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center">
+                  <span className="text-sm text-muted-foreground mr-2">
+                    {format(receivedDate, 'MMM d, yyyy h:mm a')}
+                  </span>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="icon" variant="ghost">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => setIsCreatingServiceRequest(true)}
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Create Service Request
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleFlagMessage}
+                      >
+                        <Flag className="h-4 w-4 mr-2" />
+                        {message.isFlagged ? 'Remove Flag' : 'Flag Message'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={handleArchiveMessage}
+                      >
+                        <Archive className="h-4 w-4 mr-2" />
+                        Archive
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleDeleteMessage}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-3">
+                {message.category && (
+                  <Badge variant="secondary">{message.category}</Badge>
+                )}
+
+                {message.status === 'converted' && (
+                  <Badge
+                    variant="outline"
+                    className="bg-green-50 text-green-800 border-green-200"
+                  >
+                    Converted to Service Request
+                  </Badge>
+                )}
+
+                {message.isFlagged && (
+                  <Badge
+                    variant="outline"
+                    className="bg-amber-50 text-amber-800 border-amber-200"
+                  >
+                    <Flag className="h-3 w-3 mr-1" />
+                    Flagged
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+          </Card>
+
+          <Tabs
+            value={currentTab}
+            onValueChange={(value) =>
+              setCurrentTab(value as 'thread' | 'details')
+            }
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="thread">Message Thread</TabsTrigger>
+              <TabsTrigger value="details">Details</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="thread" className="space-y-4 pt-4">
+              {/* Original message */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="prose prose-sm max-w-none">
+                    <p>{message.content}</p>
+                  </div>
+
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="mt-4 pt-4 border-t">
+                      <h4 className="text-sm font-medium mb-2 flex items-center">
+                        <Paperclip className="h-3.5 w-3.5 mr-1" />
+                        Attachments ({message.attachments.length})
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {message.attachments.map((attachment, i) => (
+                          <div
+                            key={i}
+                            className="text-xs flex items-center p-2 border rounded"
+                          >
+                            <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                            <span className="truncate">{attachment}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Loading state for thread */}
+              {isLoadingThread && (
+                <div className="flex justify-center py-4">
+                  <div className="text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                    <p className="text-sm text-muted-foreground mt-2">Loading conversation thread...</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Message thread if there are replies */}
+              {!isLoadingThread && thread && thread.messages.length > 1 && (
+                <>
+                  <div className="relative pl-6 border-l-2 border-border my-6">
+                    <div className="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-sm text-muted-foreground">
+                      Thread
+                    </div>
+
+                    <div className="space-y-4 pt-4">
+                      {thread.messages.slice(1).map((msg, i) => (
+                        <div
+                          key={i}
+                          className={`flex ${
+                            msg.sender === 'provider' ? 'justify-end' : ''
+                          }`}
+                        >
+                          <Card
+                            className={`w-5/6 ${
+                              msg.sender === 'provider' ? 'bg-primary/5' : ''
+                            }`}
+                          >
+                            <CardHeader className="p-3 pb-0">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarImage
+                                      src={
+                                        msg.sender === 'provider'
+                                          ? '/avatars/support-agent.png'
+                                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                              msg.senderName
+                                            )}&background=random`
+                                      }
+                                    />
+                                    <AvatarFallback>
+                                      {msg.senderName
+                                        .split(' ')
+                                        .map((n) => n[0])
+                                        .join('')
+                                        .toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-sm font-medium">
+                                    {msg.senderName}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(
+                                    new Date(msg.timestamp),
+                                    { addSuffix: true }
+                                  )}
+                                </span>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-3">
+                              <p className="text-sm">{msg.content}</p>
+
+                              {msg.attachments &&
+                                msg.attachments.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t">
+                                    <h4 className="text-xs font-medium mb-1 flex items-center">
+                                      <Paperclip className="h-3 w-3 mr-1" />
+                                      Attachments ({msg.attachments.length})
+                                    </h4>
+                                    <div className="flex flex-wrap gap-1">
+                                      {msg.attachments.map((attachment, i) => (
+                                        <div
+                                          key={i}
+                                          className="text-xs flex items-center p-1 border rounded"
+                                        >
+                                          <FileText className="h-3 w-3 mr-1 text-muted-foreground" />
+                                          <span className="truncate max-w-[150px]">
+                                            {attachment}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Reply box */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Reply to Client</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="Type your response here..."
+                    className="min-h-[120px]"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                  />
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" size="sm">
+                    <Paperclip className="h-3.5 w-3.5 mr-1" />
+                    Attach Files
+                  </Button>
+                  <Button
+                    onClick={handleSendReply}
+                    disabled={!replyText.trim()}
+                  >
+                    <PaperPlane className="h-4 w-4 mr-1" />
+                    Send Reply
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              {/* Service Request Creation Dialog */}
+              <Dialog
+                open={isCreatingServiceRequest}
+                onOpenChange={setIsCreatingServiceRequest}
+              >
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle>Create Service Request</DialogTitle>
+                    <DialogDescription>
+                      Convert this client message into a service request to
+                      track your work.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="service-title">
+                        Service Request Title
+                      </Label>
+                      <Input
+                        id="service-title"
+                        placeholder="Enter a title for this request"
+                        defaultValue={message.subject}
+                        value={serviceTitle}
+                        onChange={(e) => setServiceTitle(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="service-category">Category</Label>
+                      <select
+                        id="service-category"
+                        className="w-full flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={serviceCategory}
+                        onChange={(e) => setServiceCategory(e.target.value)}
+                      >
+                        <option value="">Select a category</option>
+                        <option value="Hardware">Hardware</option>
+                        <option value="Software">Software</option>
+                        <option value="Network">Network</option>
+                        <option value="Security">Security</option>
+                        <option value="Data Recovery">Data Recovery</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Training">Training</option>
+                        <option value="Consultation">Consultation</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="service-priority">Priority</Label>
+                      <div className="flex gap-4">
+                        {[1, 2, 3, 4, 5].map((p) => (
+                          <div key={p} className="flex items-center gap-1.5">
+                            <input
+                              type="radio"
+                              id={`priority-${p}`}
+                              name="priority"
+                              className="h-4 w-4"
+                              checked={servicePriority === p}
+                              onChange={() =>
+                                setServicePriority(p as 1 | 2 | 3 | 4 | 5)
+                              }
+                            />
+                            <Label
+                              htmlFor={`priority-${p}`}
+                              className="text-sm"
+                            >
+                              {p}
+                              {p === 1 && ' (Lowest)'}
+                              {p === 5 && ' (Highest)'}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox id="include-message" defaultChecked />
+                        <Label htmlFor="include-message">
+                          Include original message content
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsCreatingServiceRequest(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleCreateServiceRequest}
+                      disabled={!serviceTitle.trim()}
+                    >
+                      Create Service Request
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
+            <TabsContent value="details" className="space-y-4 pt-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">
+                    Client Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Name</p>
+                      <p className="text-sm font-medium">
+                        {message.clientName}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="text-sm font-medium">
+                        {message.clientEmail}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Client ID</p>
+                      <p className="text-sm font-medium">{message.clientId}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Category</p>
+                      <p className="text-sm font-medium">
+                        {message.category || 'Uncategorized'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Message Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        Message ID
+                      </p>
+                      <p className="text-sm font-medium">{message.id}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Received</p>
+                      <p className="text-sm font-medium flex items-center">
+                        <Calendar className="h-3.5 w-3.5 mr-1 opacity-70" />
+                        {format(receivedDate, 'PPP')}
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          ({receivedTimeAgo})
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <p className="text-sm font-medium capitalize">
+                        {message.status.replace('-', ' ')}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        Assigned To
+                      </p>
+                      <p className="text-sm font-medium">
+                        {message.assignedTo || 'Unassigned'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {message.relatedServiceId && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">
+                      Related Service Request
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm">
+                          Service Request #{message.relatedServiceId}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This message has been converted to a service request
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        View Request
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </ScrollArea>
+    </div>
+  )

@@ -1,117 +1,225 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { ClientMessage, MessageThread, ThreadMessage } from '@/lib/db';
+import { db } from '@/lib/db';
 
-// Define the ClientMessage type to match your interface
-export interface ClientMessage {
-  id: string;
-  clientId: string;
-  clientName: string;
-  clientEmail: string;
-  subject: string;
-  content: string;
-  attachments?: string[];
-  received: string; // ISO date string
-  isRead: boolean;
-  isFlagged?: boolean;
-  category?: 'support' | 'inquiry' | 'feedback' | 'billing' | 'other';
-  status: 'new' | 'in-triage' | 'converted' | 'archived' | 'deleted';
-  assignedTo?: string;
-  relatedServiceId?: string;
+// Define the interface for what the hook returns
+export interface ClientMessagesHook {
+  messages: ClientMessage[];
+  loading: boolean;
+  markAsRead: (messageId: string) => Promise<void>;
+  updateStatus: (messageId: string, status: ClientMessage['status']) => Promise<void>;
+  toggleFlag: (messageId: string) => Promise<void>;
+  getMessageThread: (messageId: string) => Promise<MessageThread | null>;
+  sendReply: (messageId: string, content: string, attachments?: string[]) => Promise<void>;
+  createServiceRequest: (messageIds: string[], serviceRequestData: any) => Promise<any>;
+  flagMessage: (messageId: string, isFlagged: boolean) => Promise<void>;
+  archiveMessages: (messageIds: string[]) => Promise<void>;
+  deleteMessages: (messageIds: string[]) => Promise<void>;
 }
 
-export function useClientMessages() {
-  // Mock message data that matches the ClientMessage interface
-  const [messages, setMessages] = useState<ClientMessage[]>([
-    {
-      id: 'msg1',
-      clientId: 'client001',
-      clientName: 'Support Vendor',
-      clientEmail: 'support@vendor.com',
-      subject: 'RE: Software License Request',
-      content:
-        'Your request for additional licenses has been approved. Please find attached the license keys and installation instructions.',
-      attachments: ['license_keys.txt', 'installation_guide.pdf'],
-      received: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-      isRead: true,
-      category: 'billing',
-      status: 'archived',
-    },
-    {
-      id: 'msg2',
-      clientId: 'client002',
-      clientName: 'John Smith',
-      clientEmail: 'john.smith@client.com',
-      subject: 'Printer not working',
-      content:
-        "Our main office printer is showing error code E-502. I've attached photos of the error and system log as requested.",
-      attachments: ['printer_error.jpg', 'system_log.txt'],
-      received: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-      isRead: false,
-      category: 'support',
-      status: 'new',
-    },
-    {
-      id: 'msg3',
-      clientId: 'client003',
-      clientName: 'IT Notifications',
-      clientEmail: 'it-notifications@company.com',
-      subject: 'Scheduled Maintenance Notice',
-      content:
-        'Please be advised that there will be scheduled maintenance this weekend. All systems will be unavailable from Saturday 10PM to Sunday 2AM.',
-      attachments: [],
-      received: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-      isRead: true,
-      category: 'other',
-      status: 'in-triage',
-    },
-    {
-      id: 'msg4',
-      clientId: 'client004',
-      clientName: 'Security Team',
-      clientEmail: 'security@company.com',
-      subject: 'Security Alert: Unauthorized Access Attempt',
-      content:
-        'Our systems detected an unauthorized access attempt to your account. Please review the attached log and confirm if this was you.',
-      attachments: ['security_log.txt'],
-      received: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
-      isRead: false,
-      category: 'support',
-      status: 'new',
-      isFlagged: true,
-    },
-  ]);
+export function useClientMessages(): ClientMessagesHook {
+  const [messages, setMessages] = useState<ClientMessage[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [threads, setThreads] = useState<Record<string, MessageThread>>({});
 
-  // Function to mark a message as read
-  const markAsRead = (id: string) => {
-    setMessages(
-      messages.map((msg) => (msg.id === id ? { ...msg, isRead: true } : msg))
-    );
-  };
+  // Load messages on mount
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        setLoading(true);
+        const fetchedMessages = await db.getMessages();
+        setMessages(fetchedMessages);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Function to update message status
-  const updateStatus = (
-    id: string,
-    status: 'new' | 'in-triage' | 'converted' | 'archived' | 'deleted'
-  ) => {
-    setMessages(
-      messages.map((msg) => (msg.id === id ? { ...msg, status } : msg))
-    );
-  };
+    fetchMessages();
+  }, []);
 
-  // Function to flag/unflag a message
-  const toggleFlag = (id: string) => {
-    setMessages(
-      messages.map((msg) =>
-        msg.id === id ? { ...msg, isFlagged: !msg.isFlagged } : msg
-      )
-    );
-  };
+  // Mark a message as read
+  const markAsRead = useCallback(async (messageId: string) => {
+    try {
+      const updatedMessage = await db.updateMessage(messageId, { isRead: true });
+      if (updatedMessage) {
+        setMessages(prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === messageId ? { ...msg, isRead: true } : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  }, []);
+
+  // Update a message's status
+  const updateStatus = useCallback(async (messageId: string, status: ClientMessage['status']) => {
+    try {
+      const updatedMessage = await db.updateMessage(messageId, { status });
+      if (updatedMessage) {
+        setMessages(prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === messageId ? { ...msg, status } : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error updating message status:', error);
+    }
+  }, []);
+
+  // Toggle flag status
+  const toggleFlag = useCallback(async (messageId: string) => {
+    try {
+      const message = messages.find(m => m.id === messageId);
+      if (!message) return;
+
+      const isFlagged = !message.isFlagged;
+      const updatedMessage = await db.updateMessage(messageId, { isFlagged });
+      
+      if (updatedMessage) {
+        setMessages(prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === messageId ? { ...msg, isFlagged } : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling flag:', error);
+    }
+  }, [messages]);
+
+  // Get a message thread
+  const getMessageThread = useCallback(async (messageId: string): Promise<MessageThread | null> => {
+    try {
+      const thread = await db.getThread(messageId);
+      if (thread) {
+        // Cache the thread locally
+        setThreads(prev => ({
+          ...prev,
+          [messageId]: thread
+        }));
+      }
+      return thread;
+    } catch (error) {
+      console.error('Error getting message thread:', error);
+      return null;
+    }
+  }, []);
+
+  // Send a reply to a message
+  const sendReply = useCallback(async (messageId: string, content: string, attachments?: string[]) => {
+    try {
+      const reply: Omit<ThreadMessage, 'id' | 'timestamp'> = {
+        sender: 'provider',
+        senderName: 'Support Agent',
+        content,
+        attachments,
+        isRead: true,
+      };
+      
+      const updatedThread = await db.addReplyToThread(messageId, reply);
+      
+      if (updatedThread) {
+        setThreads(prev => ({
+          ...prev,
+          [messageId]: updatedThread
+        }));
+      }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+    }
+  }, []);
+
+  // Create a service request from message(s)
+  const createServiceRequest = useCallback(async (messageIds: string[], serviceRequestData: any) => {
+    try {
+      const serviceRequest = await db.createServiceRequest(messageIds, {
+        title: serviceRequestData.title,
+        category: serviceRequestData.category,
+        priority: serviceRequestData.priority,
+        tags: serviceRequestData.tags || [],
+      });
+      
+      if (serviceRequest) {
+        // Update local state to reflect the conversion
+        setMessages(prevMessages =>
+          prevMessages.map(msg =>
+            messageIds.includes(msg.id)
+              ? { ...msg, status: 'converted', relatedServiceId: serviceRequest.id }
+              : msg
+          )
+        );
+      }
+      
+      return serviceRequest;
+    } catch (error) {
+      console.error('Error creating service request:', error);
+      return null;
+    }
+  }, []);
+
+  // Flag a message (using toggle flag internally)
+  const flagMessage = useCallback(async (messageId: string, isFlagged: boolean) => {
+    await toggleFlag(messageId);
+  }, [toggleFlag]);
+
+  // Archive messages
+  const archiveMessages = useCallback(async (messageIds: string[]) => {
+    try {
+      const updatePromises = messageIds.map(id => 
+        db.updateMessage(id, { status: 'archived' })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Update local state
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          messageIds.includes(msg.id) ? { ...msg, status: 'archived' } : msg
+        )
+      );
+    } catch (error) {
+      console.error('Error archiving messages:', error);
+    }
+  }, []);
+
+  // Delete messages
+  const deleteMessages = useCallback(async (messageIds: string[]) => {
+    try {
+      const updatePromises = messageIds.map(id => 
+        db.updateMessage(id, { status: 'deleted' })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Update local state
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          messageIds.includes(msg.id) ? { ...msg, status: 'deleted' } : msg
+        )
+      );
+    } catch (error) {
+      console.error('Error deleting messages:', error);
+    }
+  }, []);
 
   return {
     messages,
+    loading,
     markAsRead,
     updateStatus,
     toggleFlag,
+    getMessageThread,
+    sendReply,
+    createServiceRequest,
+    flagMessage,
+    archiveMessages,
+    deleteMessages,
   };
 }
