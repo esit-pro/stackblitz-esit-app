@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Badge } from '../../../components/ui/badge';
 import { useMessageThreads } from '../../../hooks/use-message-threads';
 import { useServiceRequest } from '../../../components/service-request/service-request-context';
-import { MessageThread } from '../../../components/messages/message-thread';
+import { MessageThread } from '../../../models/types'; // Import the MessageThread type
 import { Button } from '../../../components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/alert';
 import {
@@ -30,7 +30,7 @@ export default function ThreadPage({
   } = useMessageThreads();
   
   const { serviceRequests, fetchServiceRequestById, currentServiceRequest } = useServiceRequest();
-  const [thread, setThread] = useState(null);
+  const [thread, setThread] = useState<MessageThread | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -54,7 +54,7 @@ export default function ThreadPage({
   }, [params.threadId, getThreadById, fetchServiceRequestById]);
 
   // Handle reply submission
-  const handleReply = async (threadId: string, content: any) => {
+  const handleReply = async (threadId: string, content: string) => {
     setSubmitting(true);
     try {
       await addMessageToThread(threadId, content);

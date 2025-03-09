@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ClientMessage, clientMsgDb } from '@/lib/client-messages-db';
+import { ClientMessage, clientMsgDb } from '../lib/client-messages-db';
+const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
 
 export function useClientMessages() {
   const [messages, setMessages] = useState<ClientMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+
+
 
   const fetchMessages = useCallback(async (page = 1, limit = 50) => {
     try {
