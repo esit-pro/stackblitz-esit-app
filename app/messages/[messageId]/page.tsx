@@ -1,9 +1,7 @@
+
 import { MessageDetail } from '@/components/messages/message-detail';
 import { useClientMessages } from '@/hooks/use-client-messages';
 import { notFound } from 'next/navigation';
-
-// Make this a client component to use hooks
-('use client');
 
 export default function MessageDetailPage({
   params,

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 
 // Define the ClientMessage type to match your interface

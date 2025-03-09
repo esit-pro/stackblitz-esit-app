@@ -1,6 +1,7 @@
-'use client'
+"use client"
 
 import { useMemo, useState } from 'react';
+import { useClientMessages } from '@/hooks/use-client-messages';
 import {
   Card,
   CardContent,
@@ -16,27 +17,20 @@ import {
   Archive,
   Trash2,
   Flag,
-  Reply,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
-  CornerDownRight,
   MoreHorizontal,
-  PaperPlane,
+  Plane as PaperPlane,
   ArrowLeft,
-  ArrowRight,
-  Clock,
-  Clipboard,
-  Tag,
   FileText,
   Paperclip,
-  Star,
   Calendar,
   PlusCircle,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ClientMessage, ThreadMessage } from '@/models/types';
+import { ClientMessage } from '@/models/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -59,7 +53,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useClientMessages } from '@/hooks/use-client-messages';
 
 interface MessageDetailProps {
   message: ClientMessage | null;
@@ -67,27 +60,14 @@ interface MessageDetailProps {
   onNavigate?: (direction: 'prev' | 'next') => void;
 }
 
-export function MessageDetail({
-  message,
-  onBack,
-  onNavigate,
-}: MessageDetailProps) {
-  const [replyText, setReplyText] = useState('');
-  const [currentTab, setCurrentTab] = useState<'thread' | 'details'>('thread');
-  const [isCreatingServiceRequest, setIsCreatingServiceRequest] =
-    useState(false);
-  const [serviceTitle, setServiceTitle] = useState('');
-  const [serviceCategory, setServiceCategory] = useState('');
-  const [servicePriority, setServicePriority] = useState<1 | 2 | 3 | 4 | 5>(3);
-
+export function MessageDetail({ message }: { message: ClientMessage }) {
   const {
-    getMessageThread,
-    sendReply,
-    createServiceRequest,
-    flagMessage,
-    archiveMessages,
-    deleteMessages,
+    messages,
+    markAsRead,
+    updateStatus,
+    toggleFlag,
   } = useClientMessages();
+
 
   // Get the message thread if available
   const thread = useMemo(() => {
