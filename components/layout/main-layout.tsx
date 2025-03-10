@@ -14,8 +14,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-    <div className="h-screen">
-      <header className="border-b px-4 py-2 flex items-center align-right">
+    <div className="h-screen bg-background">
+      <header className="px-4 py-2 flex items-center justify-between">
+        <h1 className="text-lg font-medium text-primary">ESIT Pro</h1>
         <ModeToggle />
       </header>
 
@@ -28,7 +29,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             collapsible={true}
             onCollapse={() => setIsSidebarCollapsed(true)}
             onExpand={() => setIsSidebarCollapsed(false)}
-            className="bg-muted/50"
+            className=""
           >
             <ScrollArea className="h-full">
               <div className="p-4">
@@ -37,9 +38,14 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             </ScrollArea>
           </ResizablePanel>
 
-          <ResizableHandle withHandle />
+          <ResizableHandle
+            withHandle
+            className="bg-accent/0 w-2 hover:bg-accent/40 active:bg-accent/40 transition-colors"
+          />
 
-          <ResizablePanel defaultSize={85}>{children}</ResizablePanel>
+          <ResizablePanel defaultSize={85} className="bg-transparent">
+            {children}
+          </ResizablePanel>
         </ResizablePanelGroup>
       </div>
     </div>

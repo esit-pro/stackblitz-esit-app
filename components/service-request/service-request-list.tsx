@@ -33,15 +33,15 @@ import { ServiceRequest } from '@/hooks/use-service-requests';
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'New':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      return 'bg-accent/20 text-accent-foreground rounded-full px-2 py-1 text-xs';
     case 'In Progress':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      return 'bg-secondary/30 text-secondary-foreground rounded-full px-2 py-1 text-xs';
     case 'Waiting on Client':
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      return 'bg-muted/40 text-muted-foreground rounded-full px-2 py-1 text-xs';
     case 'Resolved':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      return 'bg-green-500/10 text-green-300 rounded-full px-2 py-1 text-xs';
     default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+      return 'bg-muted/20 text-muted-foreground rounded-full px-2 py-1 text-xs';
   }
 };
 
@@ -66,26 +66,26 @@ const getPriorityInfo = (priority: number) => {
 // Define the RequestSkeleton component before it's used
 function RequestSkeleton() {
   return (
-    <div className="px-4 py-3 animate-pulse">
+    <div className="px-4 py-3 animate-pulse border-b border-border/20">
       <div className="flex items-start gap-3">
         <div className="flex items-center mt-1 space-x-2">
-          <div className="h-4 w-4 rounded-sm bg-muted"></div>
+          <div className="h-4 w-4 rounded-full bg-muted/40"></div>
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between">
-            <div className="w-1/3 h-4 bg-muted rounded"></div>
-            <div className="w-1/5 h-5 bg-muted rounded"></div>
+            <div className="w-1/3 h-4 bg-muted/40 rounded"></div>
+            <div className="w-1/5 h-5 bg-muted/40 rounded"></div>
           </div>
 
-          <div className="w-1/4 h-3 bg-muted rounded mt-1"></div>
-          <div className="w-full h-4 bg-muted rounded mt-3"></div>
-          <div className="w-3/4 h-4 bg-muted rounded mt-1"></div>
+          <div className="w-1/4 h-3 bg-muted/40 rounded mt-1"></div>
+          <div className="w-full h-4 bg-muted/40 rounded mt-3"></div>
+          <div className="w-3/4 h-4 bg-muted/40 rounded mt-1"></div>
 
           <div className="flex mt-3 gap-2">
-            <div className="w-16 h-5 bg-muted rounded"></div>
-            <div className="w-16 h-5 bg-muted rounded"></div>
-            <div className="w-32 h-5 bg-muted rounded"></div>
+            <div className="w-16 h-5 bg-muted/40 rounded"></div>
+            <div className="w-16 h-5 bg-muted/40 rounded"></div>
+            <div className="w-32 h-5 bg-muted/40 rounded"></div>
           </div>
         </div>
       </div>
@@ -99,36 +99,36 @@ const ServiceRequestDetails = ({ serviceRequest }: { serviceRequest: ServiceRequ
   if (!serviceRequest) return null;
   
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">{serviceRequest.title}</h2>
-      
+    <div className="surface-elevated-1 p-4 rounded-xl space-y-4">
+      <h2 className="text-xl font-medium">{serviceRequest.title}</h2>
+        
       <div className="space-y-6">
         <div>
           <h3 className="text-lg font-medium mb-2">Description</h3>
           <p className="text-muted-foreground">{serviceRequest.description}</p>
         </div>
-        
+          
         <div className="grid grid-cols-2 gap-4">
           <div>
             <h4 className="text-sm font-medium mb-1">Client</h4>
             <p>{serviceRequest.clientName}</p>
             <p className="text-sm text-muted-foreground">{serviceRequest.clientEmail}</p>
           </div>
-          
+            
           <div>
             <h4 className="text-sm font-medium mb-1">Status</h4>
             <Badge className={getStatusColor(serviceRequest.status)}>
               {serviceRequest.status}
             </Badge>
           </div>
-          
+            
           <div>
             <h4 className="text-sm font-medium mb-1">Priority</h4>
             <Badge variant="outline" className={getPriorityInfo(serviceRequest.priority).color}>
               P{serviceRequest.priority}: {getPriorityInfo(serviceRequest.priority).label}
             </Badge>
           </div>
-          
+            
           <div>
             <h4 className="text-sm font-medium mb-1">Category</h4>
             <Badge variant="secondary">{serviceRequest.category}</Badge>
@@ -137,7 +137,7 @@ const ServiceRequestDetails = ({ serviceRequest }: { serviceRequest: ServiceRequ
 
         <div className="pt-4 border-t">
           <h3 className="text-lg font-medium mb-2">Details</h3>
-          
+            
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -149,7 +149,7 @@ const ServiceRequestDetails = ({ serviceRequest }: { serviceRequest: ServiceRequ
                   })}
                 </p>
               </div>
-              
+                
               {serviceRequest.dueDate && (
                 <div>
                   <h4 className="text-sm font-medium mb-1">Due</h4>
@@ -161,7 +161,7 @@ const ServiceRequestDetails = ({ serviceRequest }: { serviceRequest: ServiceRequ
                   </p>
                 </div>
               )}
-              
+                
               {serviceRequest.assignedTo && (
                 <div>
                   <h4 className="text-sm font-medium mb-1">Assigned To</h4>
@@ -169,7 +169,7 @@ const ServiceRequestDetails = ({ serviceRequest }: { serviceRequest: ServiceRequ
                 </div>
               )}
             </div>
-            
+              
             {serviceRequest.tags && serviceRequest.tags.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium mb-1">Tags</h4>
@@ -278,15 +278,15 @@ export function ServiceRequestList() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'New':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        return 'bg-accent/20 text-accent-foreground rounded-full px-2 py-1 text-xs';
       case 'In Progress':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+        return 'bg-secondary/30 text-secondary-foreground rounded-full px-2 py-1 text-xs';
       case 'Waiting on Client':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+        return 'bg-muted/40 text-muted-foreground rounded-full px-2 py-1 text-xs';
       case 'Resolved':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        return 'bg-green-500/10 text-green-300 rounded-full px-2 py-1 text-xs';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+        return 'bg-muted/20 text-muted-foreground rounded-full px-2 py-1 text-xs';
     }
   };
 

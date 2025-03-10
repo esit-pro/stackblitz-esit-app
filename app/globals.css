@@ -17,7 +17,8 @@
 }
 
 @layer base {
-  :root {
+  /* Light theme - no longer the default */
+  :root:not(.dark) {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -44,31 +45,54 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+  /* Dark theme - now the default */
+  :root {
+    /* Material 3 inspired dark palette with incremental monotone values */
+    --background: 210 10% 8%; /* Darkest grey for background */
+    --foreground: 210 5% 98%; /* Light text for readability */
+    
+    /* Card is slightly lighter than background - like a "desk mat" */
+    --card: 210 10% 12%;
+    --card-foreground: 210 5% 98%;
+    
+    /* Popover and dialogs */
+    --popover: 210 10% 14%;
+    --popover-foreground: 210 5% 98%;
+    
+    /* Primary accent color - blue with lower saturation */
+    --primary: 210 100% 65%;
+    --primary-foreground: 210 5% 10%;
+    
+    /* Secondary, subtle accent */
+    --secondary: 210 10% 18%;
+    --secondary-foreground: 210 5% 98%;
+    
+    /* Muted elements */
+    --muted: 210 10% 15%;
+    --muted-foreground: 210 5% 65%;
+    
+    /* Low-prominence accent */
+    --accent: 210 70% 35%;
+    --accent-foreground: 210 5% 98%;
+    
+    /* Error states */
+    --destructive: 0 62.8% 40%;
+    --destructive-foreground: 0 5% 98%;
+    
+    /* Border and UI elements */
+    --border: 210 10% 20%;
+    --input: 210 10% 16%;
+    --ring: 210 70% 50%;
+    
+    /* Chart colors - more subdued */
+    --chart-1: 210 70% 50%;
+    --chart-2: 170 60% 40%;
+    --chart-3: 30 70% 45%;
+    --chart-4: 280 60% 50%;
+    --chart-5: 340 60% 50%;
+    
+    /* Larger border radius for elements */
+    --radius: 1rem;
   }
 }
 
@@ -78,5 +102,29 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Force dark mode as default */
+  :root {
+    color-scheme: dark;
+  }
+
+  /* Main layout container styling */
+  .main-container {
+    @apply rounded-[32px] bg-card mx-auto my-6 shadow-xl;
+  }
+
+  /* Apply Material 3-style elevated surfaces */
+  .surface-elevated-1 {
+    @apply bg-card shadow-md rounded-xl;
+  }
+  
+  .surface-elevated-2 {
+    @apply bg-popover shadow-lg rounded-xl;
+  }
+  
+  /* Modern, crisp buttons */
+  .btn-accent {
+    @apply bg-accent text-accent-foreground hover:bg-accent/90 transition-colors rounded-full;
   }
 }

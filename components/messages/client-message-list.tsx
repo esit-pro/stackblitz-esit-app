@@ -265,7 +265,7 @@ export function MessageList({ messages, loading, unreadCount, selectedMessages, 
       <div className="flex-1 flex overflow-hidden">
         {/* Message list container - transitions width using CSS */}
         <div 
-          className={`overflow-hidden ${currentMessage ? 'w-[60%]' : 'w-full'} transition-all duration-300 ease-in-out`}
+          className={`p-4 rounded-xl ${currentMessage ? 'w-[60%]' : 'w-full'} transition-all duration-300 ease-in-out`}
         >
           <ScrollArea className="h-full border-r">
             {filteredMessages.length === 0 ? (
@@ -277,7 +277,7 @@ export function MessageList({ messages, loading, unreadCount, selectedMessages, 
           {filteredMessages.map((message) => (
             <li 
               key={message.id}
-              className={`hover:bg-muted/50 transition-colors cursor-pointer ${!message.isRead ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
+              className={`hover:bg-muted/50 transition-colors cursor-pointer`}
               onClick={(e) => {
                 if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
                   onToggleSelect(message.id);

@@ -4,7 +4,6 @@ import { ServiceRequestList } from '@/components/service-request/service-request
 import { ViewToggle } from '@/components/service-request/view-toggle';
 
 import { useState, useEffect } from 'react';
-import { KanbanView } from '@/components/service-request/kanban-view';
 import { Item } from '@/lib/db';
 import { ServiceRequestProvider } from '@/components/service-request/service-request-context';
 
@@ -63,39 +62,7 @@ function ServiceRequestsContent() {
         <ViewToggle view={viewMode} onChange={setViewMode} />
       </div>
 
-      {viewMode === 'list' ? (
-        <ServiceRequestList />
-      ) : (
-        <div className="mt-6">
-          <KanbanView 
-            items={serviceRequests}
-            onItemSelect={handleItemSelect}
-            selectedItemId={selectedItemId}
-            onItemMove={(result, items) => {
-              // Update item status based on the column it was moved to
-              if (
-                result.destination && 
-                result.source.droppableId !== result.destination.droppableId
-              ) {
-                const itemId = result.draggableId;
-                const newStatus = result.destination.droppableId;
-                
-                // Map column ID back to status name
-                const statusMap: Record<string, string> = {
-                  'new': 'New',
-                  'in-progress': 'In Progress',
-                  'waiting-on-client': 'Waiting on Client',
-                  'resolved': 'Resolved'
-                };
-                
-                const formattedStatus = statusMap[newStatus] || 'New';
-                handleUpdateStatus(itemId, formattedStatus);
-              }
-              return items; // Return items unchanged as we'll refresh from API
-            }}
-          />
-        </div>
-      )}
+      <ServiceRequestList />
     </div>
   );
 }
